@@ -4,7 +4,7 @@ In this project, we'll start using Terraform technology along with some practica
 - We will learn basic concepts related to Terraform
 - Try doing some hands-on demos, each Demo created in an isolated branch while working on, then merged to main.
 
-### inroduction
+### introduction
 For an Automated Infrastructure Provisioning We are going to use a common IAC tool "Terraform" which:
 - Automate and manage your infrastructure. 
 - Open source, Declarative, and universal IAC tool which supports different cloud providers & different technologies
