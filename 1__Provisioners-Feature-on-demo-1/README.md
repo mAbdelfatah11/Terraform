@@ -43,5 +43,5 @@ if the provisioner function is not executed successfully, whole resource will ma
 
 In general, for the best practices, you can use terraform for ```provisioning infrastructure```, and use Ansible tool for ```configuration managment``` for remote servers like issuing commands, installing utilities and others, so config. management tools are more efficient for config. purpose.
 so, you can use provioner "local-exec" function for local provisioning or something like that.
-but, as much as possiblea and in most cases try using user-data first and use provisioners only if there is no other option.
+but, as much as possible and in most cases try using user-data first and use provisioners only if there is no other option.
 
