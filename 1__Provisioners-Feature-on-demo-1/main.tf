@@ -147,35 +147,22 @@ resource "aws_instance" "myapp-server" {
   key_name                    = "server_key"    #or: aws_key_pair.ssh-key.key_name
 
   #user_data = file("entry-script.sh")
-
 #
-# Provisioners - "are not recommended by terraform"
+# provioner 
 #
-# it is important to note that provisioners are more provisioned function for executing remote scripts but it is not recommended.
-# helpful function rather than "user_data" 'cause user-data only "passes" the commands to the remote server after creation, so u are not aware if this commands got executed or not, terraform does not let u know what happened, it just tells u that resource created succeffuly, but,
-# provisioners help u know more about script, it is like when u ssh to a remote server to execute commands so it is more provisioned tha user-data
-# if the provisioner function is not executed successfully, whole resource will marked as fail after issuing > terraform apply, so it let u know!!
-
-#why prov. is not recommended?
-# it breaks the base idea of terraform "current-desired state comparison", if u executed the script for the first time in the server, terraform did not actually know what you had done there, becaue you copied the script from local to the remote then executed it there, then for the next time, TF can not compare current state in the server with the desired state, it does not actually know what happened there.
-# for user-data, terraform "hashes" and "pass" it to the server, so next time it will compare the current hash with the new hash, if the new hash id differ from current one, then TF will execute the user-data again to apply the changes.
-
-# in general, for the best practices, u can use terraform for provisioning infrastructure, and use Ansible tool for configuration managment to remote servers like issuing commands and installing utilities and others, config. management tools are more efficient for config. purpose.
-# also  use can use provioner "local-exec" function for local provisioning or something like that.
-# also as most as possible, try to use user-data over provisioner.
-
+  # connect to remote
   connection {
         type = "ssh"
         host = self.public_ip
         user = "ec2-user"
         private_key = file(var.private_key_location)
     }
-
+  # copy file from local to remote
   provisioner "file" {
         source = "entry-script.sh"
         destination = "/home/ec2-user/entry-script-on-ec2.sh"
     }
-
+  # execute copied file
   provisioner "remote-exec" {
         script = file("entry-script.sh")
     }
@@ -183,6 +170,7 @@ resource "aws_instance" "myapp-server" {
   provisioner "local-exec" {
         command = "echo ${self.public_ip} > output.txt"
     }
+  
   tags = {
     Name = "${var.env_prefix}-server"
   }
