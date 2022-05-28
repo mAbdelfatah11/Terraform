@@ -22,7 +22,7 @@ AS on demo-1:
 
 ![differ-user_data-provisioners](difference--userData--provisioners.png)
 
-* However, Provisioner is not recommended on most of its uses from Terraform docs ![terraform.com]
+* However, Provisioner is not recommended on most of its uses from Terraform docs [terrafrom docs](https://www.terraform.io/language/resources/provisioners/syntax)
 
 ![provioner-is-not-recommended](provioner-is-not-recommended.png)
 
@@ -38,10 +38,10 @@ if the provisioner function is not executed successfully, whole resource will ma
 
 > Why provisioner is not recommended?
 
-* it breaks the base idea of terraform "current-desired state comparison", if u executed the script for the first time in the server, terraform did not actually know what you had done there, becaue you copied the script from local to the remote then executed it there, then for the next time, TF can not compare current state in the server with the desired state, it does not actually know what happened there.
-for user-data, terraform "hashes" and "pass" it to the server, so next time it will compare the current hash with the new hash, if the new hash id differ from current one, then TF will execute the user-data again to apply the changes.
+* it breaks the base idea of terraform "current-desired state comparison", if u executed the script for the first time in the server, terraform does not not actually know what you have done there, becaue you have copied the script from local to the remote then executed it there, for the next time, TF can not compare current state in the server with the desired state, it does not actually know what happened there.
+* for user-data, terraform "hashes" and "pass" it to the server, so next time it will compare the current hash with the new hash, if the new hash id differ from current one, then TF will execute the user-data again to apply the changes.
 
-* in general, for the best practices, u can use terraform for provisioning infrastructure, and use Ansible tool for configuration managment to remote servers like issuing commands and installing utilities and others, config. management tools are more efficient for config. purpose.
-also  use can use provioner "local-exec" function for local provisioning or something like that.
-also as most as possible, try to use user-data over provisioner.
+In general, for the best practices, you can use terraform for ```provisioning infrastructure```, and use Ansible tool for ```configuration managment``` for remote servers like issuing commands, installing utilities and others, so config. management tools are more efficient for config. purpose.
+so, you can use provioner "local-exec" function for local provisioning or something like that.
+but, as much as possiblea and in most cases try using user-data first and use provisioners only if there is no other option.
 
