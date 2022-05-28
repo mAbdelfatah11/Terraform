@@ -1,140 +1,186 @@
+
+# Demo: create AWS infrastructure for deployiny a dockerized app.    
+#
+# author: Mahmoud Abdelfatah / DevOps engineer - WideBot
+# 
+
 provider "aws" {
-    region = "eu-west-3"
+  region = "us-west-2"
 }
 
-variable vpc_cidr_block {}
-variable subnet_cidr_block {}
-variable avail_zone {}
+#
+# Variables
+#
+variable cidr_blocks {
+  description = "list of objects includes cidr-blocks for vpc and subnets "
+  type = list(object({
+    name = string
+    cidr_block = string   #pass environemnt as a tag value for each resource.
+
+  }))
+}
 variable env_prefix {}
+variable avail_zone {}
 variable my_ip {}
+variable public-key-location {}
 variable instance_type {}
-variable public_key_location {}
 
+
+
+#
+# Infrastructure
+#
 resource "aws_vpc" "myapp-vpc" {
-    cidr_block = var.vpc_cidr_block
-    tags = {
-        Name = "${var.env_prefix}-vpc"
-    }
+  cidr_block = var.cidr_blocks[0].cidr_block
+  tags = {
+      Name = "${var.env_prefix}-vpc"
+  }
 }
-
-resource "aws_subnet" "myapp-subnet-1" {
-    vpc_id = aws_vpc.myapp-vpc.id
-    cidr_block = var.subnet_cidr_block
-    availability_zone = var.avail_zone
-    tags = {
-        Name = "${var.env_prefix}-subnet-1"
-    }
+#public-subnet-1
+resource "aws_subnet" "myapp-public-subnet-1" {
+  vpc_id = aws_vpc.myapp-vpc.id
+  cidr_block = var.cidr_blocks[1].cidr_block
+  availability_zone = var.avail_zone
+  tags = {
+    Name = "${var.env_prefix}-public-subnet-1"
+  } 
 }
-
+#Igw
 resource "aws_internet_gateway" "myapp-igw" {
-    vpc_id = aws_vpc.myapp-vpc.id
+	vpc_id = aws_vpc.myapp-vpc.id
+    
     tags = {
-        Name = "${var.env_prefix}-igw"
-    }
+     Name = "${var.env_prefix}-internet-gateway"
+   }
+}
+#RT
+resource "aws_route_table" "myapp-route-table" {
+   vpc_id = aws_vpc.myapp-vpc.id
+
+   route {
+     cidr_block = "0.0.0.0/0"
+     gateway_id = aws_internet_gateway.myapp-igw.id
+   }
+   # default route, mapping VPC CIDR block to "local", created implicitly and cannot be specified explicitly.
+   tags = {
+     Name = "${var.env_prefix}-route-table"
+   }
+ }
+# Associate subnet with Route Table
+resource "aws_route_table_association" "associate-RT-subnet" {
+  subnet_id      = aws_subnet.myapp-public-subnet-1.id
+  route_table_id = aws_route_table.myapp-route-table.id
 }
 
-resource "aws_default_route_table" "main-rtb" {
-    default_route_table_id = aws_vpc.myapp-vpc.default_route_table_id
 
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.myapp-igw.id
-    }
-    tags = {
-        Name = "${var.env_prefix}-main-rtb"
-    }
+
+#
+# Servers
+#
+
+#ami
+data "aws_ami" "amazon-linux-image" {
+  most_recent = true      # grab the first one that owned by amazon after applying the following filters
+  owners      = ["amazon"]  #specify owner account-id or owner alias like "amazon" or "self" if this image owned by amazon or my account.
+
+  filter {
+    name   = "name" #match by name
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"] # 
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
-resource "aws_default_security_group" "default-sg" {
-    vpc_id = aws_vpc.myapp-vpc.id
-
-    ingress {
-        from_port = 22
-        to_port = 22
-        protocol = "tcp"
-        cidr_blocks = [var.my_ip]
-    }
-
-    ingress {
-        from_port = 8080
-        to_port = 8080
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-        prefix_list_ids = []
-    }
-
-    tags = {
-        Name = "${var.env_prefix}-default-sg"
-    }
+output "ami_id" {
+  value = data.aws_ami.amazon-linux-image.id
 }
 
-/*
-resource "aws_security_group_rule" "web-http" {
-  security_group_id = aws_vpc.myapp-vpc.default_security_group_id
-  type              = "ingress"
-  from_port         = 8080
-  to_port           = 8080
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+#SecGroup
+resource "aws_security_group" "myapp-sg" {
+  name   = "myapp-sg"
+  vpc_id = aws_vpc.myapp-vpc.id
+
+  ingress {
+    from_port   = 22    #note: if you specified from-to values to be = 0 to 1000  for example, then you implicitly allow 1000 open ports
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.my_ip] #src
+  }
+
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port       = 0 #all
+    to_port         = 0
+    protocol        = "-1"  #all
+    cidr_blocks     = ["0.0.0.0/0"]
+    prefix_list_ids = []  # allow accessing all vpc endpoints
+  }
+
+  tags = {
+    Name = "${var.env_prefix}-sg"
+  }
 }
 
-resource "aws_security_group_rule" "server-ssh" {
-  security_group_id = aws_vpc.myapp-vpc.default_security_group_id
-  type              = "ingress"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = [var.my_ip]
-}
-*/
-
-data "aws_ami" "latest-amazon-linux-image" {
-    most_recent = true
-    owners = ["amazon"]
-    filter {
-        name = "name"
-        values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-    }
-    filter {
-        name = "virtualization-type"
-        values = ["hvm"]
-    }
+#keyPair
+resource "aws_key_pair" "ssh-key" {
+  key_name   = "server_key"
+  public_key = file(var.public-key-location)   #create keypair locally using >$ ssh-keygen -t rsa -f key-name , then refer to pub key location instead of hardcoding key.
 }
 
-output "aws_ami_id" {
-    value = data.aws_ami.latest-amazon-linux-image.id
-}
+# EC2-instance-1
+resource "aws_instance" "myapp-server" {
+  ami                         = data.aws_ami.amazon-linux-image.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.myapp-public-subnet-1.id
+  availability_zone			      = var.avail_zone
+  vpc_security_group_ids      = [aws_security_group.myapp-sg.id]  
+  associate_public_ip_address = true
+  key_name                    = "server_key"    #or: aws_key_pair.ssh-key.key_name
 
-output "ec2_public_ip" {
+  user_data = file("entry-script.sh")
+  
+  tags = {
+    Name = "${var.env_prefix}-server"
+  }
+
+
+}
+output "server-ip" {
     value = aws_instance.myapp-server.public_ip
 }
 
-resource "aws_key_pair" "ssh-key" {
-    key_name = "server-key"
-    public_key = file(var.public_key_location)
+/*
+
+# EC2-instance-2
+
+resource "aws_instance" "myapp-server-two" {
+  ami                         = data.aws_ami.amazon-linux-image.id
+  instance_type               = var.instance_type
+  key_name                    = "myapp-key"
+  associate_public_ip_address = true
+  subnet_id                   = aws_subnet.myapp-subnet-1.id
+  vpc_security_group_ids      = [aws_security_group.myapp-sg.id]
+  availability_zone			      = var.avail_zone
+
+  tags = {
+    Name = "${var.env_prefix}-server-two"
+  }
+
+  user_data = <<EOF
+                 #!/bin/bash
+                 apt-get update && apt-get install -y docker-ce
+                 systemctl start docker
+                 usermod -aG docker ec2-user
+                 docker run -p 8080:8080 nginx
+              EOF
 }
-
-resource "aws_instance" "myapp-server" {
-    ami = data.aws_ami.latest-amazon-linux-image.id
-    instance_type = var.instance_type
-
-    subnet_id = aws_subnet.myapp-subnet-1.id
-    vpc_security_group_ids = [aws_default_security_group.default-sg.id]
-    availability_zone = var.avail_zone
-
-    associate_public_ip_address = true
-    key_name = aws_key_pair.ssh-key.key_name
-
-    user_data = file("entry-script.sh")
-
-    tags = {
-        Name = "${var.env_prefix}-server"
-    }
-}
+*/
