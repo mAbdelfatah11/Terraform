@@ -1,5 +1,6 @@
 # Local .terraform directories
 **/.terraform/*
+*.xml
 
 # .tfstate files
 *.tfstate
@@ -18,3 +19,8 @@ terraform.rc
 
 # Ignore Mac/OSX system file, with the folder metadata
 .DS_Store
+
+# ignore terraform error or crash files
+crash.log
+
+
